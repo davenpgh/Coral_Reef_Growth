@@ -1,0 +1,286 @@
+---
+title: "Exploring Bozec, Yakob, Bejarano and Mumby (2013) with Two Genuses of Parrotfish"
+author: "Grace Davenport"
+date: "4/26/2022"
+output: pdf_document
+header-includes:
+ \usepackage{float}
+ \floatplacement{figure}{H}
+---
+
+# Introduction
+Coral reefs are often referred to as the “rainforest of the sea” due to the diversity of life found within their ecosystems. According to NOAA, about 25% of the ocean’s fish depend on healthy coral reefs for shelter, food and reproduction. For example, the Northwest Hawaiian Island coral reefs support more than 7,000 species of fishes, invertebrates, plants, sea turtles, birds, and marine mammals (NOAA 2020). This biodiversity makes them a prime candidate for conservation. 
+
+Despite conservationists best efforts, these ecosystems are still highly endangered. In recent years, elevated global temperatures have contributed to coral bleaching (Donner 2011). This process occurs when corals expel the algae (zooxanthellae) living in their tissues, therefore, turning the coral white. Another threat to coral reefs is ocean acidification from atmospheric $CO_2$. As oceans become more acidic, calcium carbonate levels decrease. Many organisms, like coral, utilize calcium carbonate to build their exoskeletons. 
+
+To prevent further degradation of these diverse ecosystems, researchers have turned to biological predictive models to study dynamics between various reef organisms. This paper will explore the interaction between four organisms: coral, macroalgae, algal turf and two different genuses of parrotfish (_Scarus_ and _Sparisoma_). 
+
+The reef bed is primarily composed of three organisms: (1) coral, (2) macroalgae and (3) algal turf (Mumby et. al 2007). First, coral polys are tiny, soft-bodied organisms with a hard, protective limestone skeleton at their base. Second, macroalgae, commonly referred to as seaweed, encompass a variety of macroscopic, multicellular marine algae. Third, algal turf is a thick bed of seaweed that colonizes along bare substrate. 
+
+Although coral can only expand onto turf, macroalgae can successfully expand onto both turf and coral. The authors assume that coral and macroalgae have an intrinsic colonization rate on occupied space, yet are only successfully when colonizing an area within the outlines previous mentioned. Turf enters the ecosystem by two mechanisms, (1) when fish heavily graze macroalgae down to the bare substrate and (2) when coral dies and leaves unoccupied space. The latter occurs at a constant rate per capita.
+
+Parrotfish graze at a constant rate on macroalgae and algal turf. However, the genus _Scarus_ preferentially grazes on algal turf, whereas the genus _Sparisoma_ indiscriminately grazes on both algal types. It is assumed that these grazing rates are intrinsic to each genus of parrotfish and their biological properties. Additionally, grazing is proportional to macroalgae and algal turf relative abundance on the reef. 
+
+# Model Development 
+
+The Bozec, Yakob, Bejarano and Mumby (2013) model incorporates three state variables: coral ($C$), macroalgae ($M$) and algal turfs ($T$). Each of these variables is measured as a fraction of the seabed occupied. One organism is always replaced by another, so that no space on the reef is ever empty, written as $1 = T + M + C$. 
+
+Their model is as follows,
+\begin{align}
+\frac{dC}{dt} &= rTC - dC - aMC,\\
+\frac{dM}{dt} &= aMC - \frac{G_{spar}M}{M+T} + \gamma MT - (G_{scar} + \frac{G_{spar}T}{M + T})MT,\\
+\frac{dT}{dt} &= \frac{M}{M+T} \cdot g + dC  - rTC - \gamma TM.
+\end{align} 
+
+The term $rTC$ represents the rate that coral is recruited onto turf. Every unit of coral contributes $rT$ recruitment and this per unit recruitment is proportional to $T$. The more turf present, the more coral recruited onto turf. Similarly, the term $aMC$ represents the rate that macroalgae overgrows coral. The per capita recruitment rate, $aC$, is proportional to $C$. The more coral present, the more macroalgae recruited onto coral. The overall coral death rate, $dC$, is proportional the per capita death rate $d$. If more coral is present, a higher amount of coral will die off, even though the per capita death rate $d$ remains constant. 
+
+The term $\frac{G_{spar}M}{M+T}$ represents the grazing of macroalgae by _Sparisoma_. As mentioned above, _Sparisoma_ indiscriminately grazes on both algal types, and therefore, must split its time grazing between macroalgae and turf. The term $\frac{M}{M+T}$ is the proportion of macroalgae to total algae in the ecosystem.  
+
+Macroalgae overgrows turf at a rate of $\gamma$$MT$. Every unit of macroalgae contributes $\gamma$$T$ recruitment, which is proportional to $T$. This recruitment rate is slowed by grazing from _Sparisoma_ and _Scarus_. All of _Scarus's_ energy is spent grazing on turf, whereas _Sparisoma_ only grazes on turf at a rate proportional to the turf's relative abundance. Therefore, for every unit of macroalgae, its recruitment rate over turf is slowed at a rate of $(G_{scar} + \frac{G_{spar}T}{M+T})T$. 
+
+A growth rate increase in one area will result in a rate of loss in another area in exact balance, as previously mentioned $1 = T + M + C$. To limit the number of state variables, the proportion of algal turf can be written as $T = 1 - M - C$ and substituted into the model.  
+
+# Analysis
+Initial analysis was conducted by experimenting with model parameters. All initial values remained the same at $C(0)=0.3$, $M(0)=0.5$ and $T(0)=0.2$.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+library(deSolve)
+library(pracma)
+```
+
+```{r, echo=FALSE, fig.cap="Plot of coral, macroalgae, and algalturf over time with initial values $C(0)=0.3$, $M(0)=0.5$ and $T(0)=0.2$ and model parameters $r=5, d=0.5, a=0.3$, $\\gamma=0.2$, $G_{scar}=5, G_{spar}=5$."}
+
+# Define the function giving rates
+MumbyRates = function(t, state, param) {
+  with(as.list(c(state, param)), {
+    T = 1 - C - M
+    dC = r*C*T - d*C - a*M*C
+    dM = a*C*M - ((Gsp*M)/(M+T)) + gamma*M*T - (Gsc + ((Gsp*T)/(M+T)))*M*T
+    
+    list(c(dC, dM))
+  })
+}
+
+times = seq(0,5,by=0.1)
+myParams = c(r=5, d=0.5, a=0.3, gamma=0.20, Gsc=5, Gsp=5)
+
+soln = ode(c(C=0.3, M=0.5), times, MumbyRates, myParams)
+
+C = soln[,"C"]
+M = soln[,"M"]
+T = 1 - C - M 
+
+plot(times, C, type='l', lwd=2, col='coral',
+     ylim=c(0,1), ylab="Population Percent Coverage", main="Population % Coverage over time of Coral, Macroalgae, and Algal Turf", cex.main=1)
+lines(times, M, lwd=2, col='green')
+lines(times, T, lwd=2, col='brown')
+legend('topright', legend=c('C','M','T'), lwd=2,
+       col=c('coral','green','brown'))
+```
+
+```{r, include=FALSE}
+tail(C)
+tail(M)
+tail(T)
+```
+At high grazing rates, coral reaches an equilibrium of 0.9. The more fish present, the higher the grazing rate on macroalgae. Therefore, macroalgae  overgrows coral at a slower rate and frees up space for coral to colonize. Macroalgae steadily decreases to an equilibrium of 0. At $t=0.1$, algal turf momentarily spikes to 0.5 and falls again to an equilibrium of 0.1. 
+
+```{r, echo=FALSE, fig.cap="Plot of coral, macroalgae, and algalturf over time with initial values $C(0)=0.3$, $M(0)=0.5$ and $T(0)=0.2$ and model parameters $r=0.5, d=0.5, a=0.3$, $\\gamma=0.2$, $G_{scar}=0, G_{spar}=0$."}
+
+# Define the function giving rates
+MumbyRates = function(t, state, param) {
+  with(as.list(c(state, param)), {
+    T = 1 - C - M
+    dC = r*C*T - d*C - a*M*C
+    dM = a*C*M - ((Gsp*M)/(M+T)) + gamma*M*T - (Gsc + ((Gsp*T)/(M+T)))*M*T
+    
+    list(c(dC, dM))
+  })
+}
+
+times = seq(0,30,by=0.1)
+myParams = c(r=0.5, d=0.5, a=0.3, gamma=0.20, Gsc=0, Gsp=0)
+
+soln = ode(c(C=0.3, M=0.5), times, MumbyRates, myParams)
+
+C = soln[,"C"]
+M = soln[,"M"]
+T = 1 - C - M 
+
+plot(times, C, type='l', lwd=2, col='coral',
+     ylim=c(0,1), ylab="Population Percent Coverage", main="Population % Coverage over time of Coral, Macroalgae, and Algal Turf", cex.main=1)
+lines(times, M, lwd=2, col='green')
+lines(times, T, lwd=2, col='brown')
+legend('topright', legend=c('C','M','T'), lwd=2,
+       col=c('coral','green','brown'))
+```
+
+```{r, include=FALSE}
+tail(C)
+tail(M)
+tail(T)
+```
+When grazing is non-existent, macroalgae completely outcompetes coral and turf. Coral quickly declines to an equilibrium of 0. Turf slightly increases, like in Figure 1, but eventually declines to an equilibrium of 0. Macroalgae can successfully overgrow coral and algal turf without grazers to decrease the macroalgae growth rate. 
+
+```{r, echo=FALSE, fig.cap="Plot of coral, macroalgae, and algalturf over time with initial values $C(0)=0.3$, $M(0)=0.5$ and $T(0)=0.2$ and model parameters $r=5, d=0.5, a=0.3$, $\\gamma=0.2$, $G_{scar}=0, G_{spar}=0$."}
+
+# Define the function giving rates
+MumbyRates = function(t, state, param) {
+  with(as.list(c(state, param)), {
+    T = 1 - C - M
+    dC = r*C*T - d*C - a*M*C
+    dM = a*C*M - ((Gsp*M)/(M+T)) + gamma*M*T - (Gsc + ((Gsp*T)/(M+T)))*M*T
+    
+    list(c(dC, dM))
+  })
+}
+
+times = seq(0,30,by=0.1)
+myParams = c(r=5, d=0.5, a=0.3, gamma=0.20, Gsc=0, Gsp=0)
+
+soln = ode(c(C=0.3, M=0.5), times, MumbyRates, myParams)
+
+C = soln[,"C"]
+M = soln[,"M"]
+T = 1 - C - M 
+
+plot(times, C, type='l', lwd=2, col='coral',
+     ylim=c(0,1), ylab="Population Percent Coverage", main="Population % Coverage over time of Coral, Macroalgae, and Algal Turf", cex.main=1)
+lines(times, M, lwd=2, col='green')
+lines(times, T, lwd=2, col='brown')
+legend('topright', legend=c('C','M','T'), lwd=2,
+       col=c('coral','green','brown'))
+```
+
+```{r, include=FALSE}
+tail(C)
+tail(M)
+tail(T)
+```
+In this simulation, $r$ was increased by a magnitude of 10, in hopes of making coral a better competitor. Coral overgrows algal turf at a rate of $r$. Compared to Figure 2, coral increases slightly instead of immediately declining. Algal turf only decreases, instead of initially increasing in Figure 2. Despite this change, macroalgae still completely outcompetes coral and turf, reaching the same equilibrium as Figure 2. 
+
+# Further Analysis
+Further analysis was conducted to explore the stability of each equilibrium found in Figures 1-3. This was done by adjusting initial values slightly off from their equilibrium values. All model parameters were kept consistent with Figures 1-3.
+
+```{r, echo=FALSE, fig.cap="Plot of coral, macroalgae, and algalturf over time with initial values $C(0)=0.91$, $M(0)=0.08$ and $T(0)=0.01$ and model parameters from Figure 1: $r=5, d=0.5, a=0.3$, $\\gamma=0.2$, $G_{scar}=5, G_{spar}=5$."}
+
+# Define the function giving rates
+MumbyRates = function(t, state, param) {
+  with(as.list(c(state, param)), {
+    T = 1 - C - M
+    dC = r*C*T - d*C - a*M*C
+    dM = a*C*M - ((Gsp*M)/(M+T)) + gamma*M*T - (Gsc + ((Gsp*T)/(M+T)))*M*T
+    
+    list(c(dC, dM))
+  })
+}
+
+times = seq(0,5,by=0.1)
+myParams = c(r=5, d=0.5, a=0.3, gamma=0.20, Gsc=5, Gsp=5)
+
+soln = ode(c(C=0.91, M=0.08), times, MumbyRates, myParams)
+
+C = soln[,"C"]
+M = soln[,"M"]
+T = 1 - C - M 
+
+plot(times, C, type='l', lwd=2, col='coral',
+     ylim=c(0,1), ylab="Population Percent Coverage", main="Population % Coverage over time of Coral, Macroalgae, and Algal Turf", cex.main=1)
+lines(times, M, lwd=2, col='green')
+lines(times, T, lwd=2, col='brown')
+legend('topright', legend=c('C','M','T'), lwd=2,
+       col=c('coral','green','brown'))
+```
+
+```{r, include=FALSE}
+tail(C)
+tail(M)
+tail(T)
+```
+The initial values were changed to $C(0)=0.91$, $M(0)=0.08$ and $T(0)=0.01$. Despite this change, coral, macroalgae and turf return to their equilibrium of $C=0.9$, $M=0$ and $T=0.1$. Therefore, this is a stable equilibrium.
+
+```{r, echo=FALSE, fig.cap="Plot of coral, macroalgae, and algalturf over time with initial values $C(0)=0.05$, $M(0)=0.9$ and $T(0)=0.05$ and model parameters from Figure 2: $r=0.5, d=0.5, a=0.3$, $\\gamma=0.2$, $G_{scar}=0, G_{spar}=0$."}
+
+# Define the function giving rates
+MumbyRates = function(t, state, param) {
+  with(as.list(c(state, param)), {
+    T = 1 - C - M
+    dC = r*C*T - d*C - a*M*C
+    dM = a*C*M - ((Gsp*M)/(M+T)) + gamma*M*T - (Gsc + ((Gsp*T)/(M+T)))*M*T
+    
+    list(c(dC, dM))
+  })
+}
+
+times = seq(0,30,by=0.1)
+myParams = c(r=0.5, d=0.5, a=0.3, gamma=0.20, Gsc=0, Gsp=0)
+
+soln = ode(c(C=0.05, M=0.9), times, MumbyRates, myParams)
+
+C = soln[,"C"]
+M = soln[,"M"]
+T = 1 - C - M 
+
+plot(times, C, type='l', lwd=2, col='coral',
+     ylim=c(0,1), ylab="Population Percent Coverage", main="Population % Coverage over time of Coral, Macroalgae, and Algal Turf", cex.main=1)
+lines(times, M, lwd=2, col='green')
+lines(times, T, lwd=2, col='brown')
+legend('topright', legend=c('C','M','T'), lwd=2,
+       col=c('coral','green','brown'))
+```
+
+```{r, include=FALSE}
+tail(C)
+tail(M)
+tail(T)
+```
+
+The initial values were changed to $C(0)=0.05$, $M(0)=0.9$ and $T(0)=0.05$. Despite this change, coral, macroalgae and turf return to their equilibrium of $C=0$, $M=1$ and $T=0$. Therefore, this is a stable equilibrium.
+
+```{r, echo=FALSE, fig.cap="Plot of coral, macroalgae, and algalturf over time with initial values $C(0)=0.05$, $M(0)=0.9$ and $T(0)=0.05$ and model parameters $r=5, d=0.5, a=0.3$, $\\gamma=0.2$, $G_{scar}=0, G_{spar}=0$."}
+
+# Define the function giving rates
+MumbyRates = function(t, state, param) {
+  with(as.list(c(state, param)), {
+    T = 1 - C - M
+    dC = r*C*T - d*C - a*M*C
+    dM = a*C*M - ((Gsp*M)/(M+T)) + gamma*M*T - (Gsc + ((Gsp*T)/(M+T)))*M*T
+    
+    list(c(dC, dM))
+  })
+}
+
+times = seq(0,30,by=0.1)
+myParams = c(r=5, d=0.5, a=0.3, gamma=0.20, Gsc=0, Gsp=0)
+
+soln = ode(c(C=0.05, M=0.9), times, MumbyRates, myParams)
+
+C = soln[,"C"]
+M = soln[,"M"]
+T = 1 - C - M 
+
+plot(times, C, type='l', lwd=2, col='coral',
+     ylim=c(0,1), ylab="Population Percent Coverage", main="Population % Coverage over time of Coral, Macroalgae, and Algal Turf", cex.main=1)
+lines(times, M, lwd=2, col='green')
+lines(times, T, lwd=2, col='brown')
+legend('topright', legend=c('C','M','T'), lwd=2,
+       col=c('coral','green','brown'))
+```
+
+```{r, include=FALSE}
+tail(C)
+tail(M)
+tail(T)
+```
+Again, the initial values were changed to $C(0)=0.05$, $M(0)=0.9$ and $T(0)=0.05$. Despite this change, coral, macroalgae and turf return to their equilibrium of $C=0$, $M=1$ and $T=0$. Therefore, this is a stable equilibrium.
+
+# Discussion
+
+In a separate paper, Bozec et al. (2013) explored the effect of rugosity on parrotfish abundance, and therefore grazing rates. Rugosity is a measure of structural complexity of a reef. The authors tested both a linear and a Type II Holling response and found that parrotfish abundance increases as rugosity increases. When rugosity is high enough, parrotfish reach saturation due to, for example, density dependent competition among parrotfish for food resources and habitat. Ultimately, the authors concluded if rugosity increases, then parrotfish abundance increases, which leads to an increase in grazing and, in turn, coral faces less competition and maintains greater rugosity.
+
+In concurrence, my analysis found a similar conclusion. When $G_{scar}=5$ and $G_{spar}=5$, coral could outcompete macroalgae and algal turf to maintain rugosity, as seen in Figure 1. This makes sense because parrotfish graze on macroalgae and algal turf, therefore, freeing up space for coral to colonize. 
+
+Further, the authors concluded that the macroalgal overgrows turf at a slower rate when parrotfish grazing is introduced (as reflected in the final term in the model). My analysis similarly found that as $G_{spar}$ and $G_{scar}$ increased, macroalgae decreased. When $G_{spar} = 0$ and $G_{scar} = 0$, macroalgae dominated the ecosystem ($M=1$), no matter the $r$ value, see Figures 2 and 3. 
+
+
